@@ -5,6 +5,7 @@ Thực thi so sánh giữa Chatbot Baseline (Cấp 2) và ReAct Agent kết nố
 
 import json
 import os
+import re
 import sys
 import time
 from dotenv import load_dotenv
@@ -21,6 +22,7 @@ from mcp_server import MCPAcademicServer
 from prompts import (
     CHATBOT_BASELINE_PROMPT,
     REACT_AGENT_SYSTEM_PROMPT,
+    SUPPLY_CHAIN_AGENT_SYSTEM_PROMPT,
     MAX_ITERATIONS
 )
 from providers import get_llm_provider
@@ -45,6 +47,9 @@ def load_test_cases():
 
 def save_waterfall_trace(trace_data: list):
     """Ghi vết log Waterfall Trace Log ra file docs/trace_waterfall.json"""
+    if "--no-save" in sys.argv:
+        print("ℹ️ [OBSERVABILITY]: --no-save đang bật; không ghi đè trace hiện có.")
+        return
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     docs_dir = os.path.join(base_dir, "docs")
     os.makedirs(docs_dir, exist_ok=True)
@@ -66,11 +71,16 @@ def run_react_agent(user_query: str, provider, mcp_server: MCPAcademicServer) ->
     [REACT AGENT LOOP] Thực thi vòng lặp Thought -> Action -> Observation với MCP Server
     Trả về danh sách trace log của phiên thực thi.
     """
+    if "vận đơn" in user_query.lower() or re.search(r"\bVD\d+\b", user_query, re.IGNORECASE):
+        return run_supply_chain_agent(user_query, provider, mcp_server)
     print(f"\n🤖 [REACT AGENT] Câu hỏi: {user_query}")
     
     step = 0
     trace_logs = []
-    tools_list = mcp_server.list_tools()
+    tools_list = [
+        tool for tool in mcp_server.list_tools()
+        if tool.get("name") in {"academic_query", "schedule_appointment"}
+    ]
     
     while step < MAX_ITERATIONS:
         step += 1
@@ -159,6 +169,124 @@ def run_react_agent(user_query: str, provider, mcp_server: MCPAcademicServer) ->
             })
             break
 
+    return trace_logs
+
+
+def run_supply_chain_agent(user_query: str, provider, mcp_server: MCPAcademicServer) -> list:
+    """Run the shipment ReAct loop without changing the starter academic path."""
+    print(f"\n📦 [SUPPLY CHAIN AGENT] Câu hỏi: {user_query}")
+    supply_tools = [
+        tool for tool in mcp_server.list_tools()
+        if tool.get("name") in {"shipment_query", "update_order_status"}
+    ]
+    lookup_tools = [tool for tool in supply_tools if tool["name"] == "shipment_query"]
+    update_tools = [tool for tool in supply_tools if tool["name"] == "update_order_status"]
+    conditional_update = "chỉ khi" in user_query.lower() and "cập nhật" in user_query.lower()
+    tracking_match = re.search(r"\bVD\d+\b", user_query, re.IGNORECASE)
+    requested_id = tracking_match.group(0).upper() if tracking_match else None
+    target_match = re.search(r"(?:thành|sang)\s*['\"]?(Đang giao|Đã giao)", user_query, re.IGNORECASE)
+    requested_status = target_match.group(1).lower() if target_match else None
+    condition_match = re.search(r"chỉ khi.*?(Đang ở kho|Đang giao|Đã giao)", user_query, re.IGNORECASE)
+    required_status = condition_match.group(1) if condition_match else None
+    prompt = user_query
+    trace_logs = []
+    needs_update = False
+
+    for step in range(1, MAX_ITERATIONS + 1):
+        if conditional_update and (required_status is None or requested_status is None):
+            answer = "Chưa xác định được điều kiện hoặc trạng thái đích; không cập nhật vận đơn."
+            break
+        available_tools = update_tools if needs_update else lookup_tools if conditional_update else supply_tools
+        # For an explicit, unconditional status change, do not offer lookup as an alternative action.
+        if not conditional_update and "cập nhật" in user_query.lower() and requested_status is not None:
+            available_tools = update_tools
+        step_start = time.time()
+        response = provider.generate_with_tools(
+            prompt, available_tools, system_prompt=SUPPLY_CHAIN_AGENT_SYSTEM_PROMPT
+        )
+        llm_live = bool(getattr(provider, "last_call_live", False))
+        thought = response.get("thought", "Đang chọn bước tiếp theo.")
+        response_type = response.get("type")
+
+        if response_type == "text":
+            answer = response.get("content", "") if not requested_id else "Chưa thể xác minh vận đơn vì mô hình không gọi công cụ tra cứu hoặc cập nhật."
+            trace_logs.append({
+                "step": step, "query": user_query, "action_type": "FINAL_ANSWER",
+                "thought": thought, "output": answer,
+                "llm_live": llm_live,
+                "latency_ms": round((time.time() - step_start) * 1000, 2),
+            })
+            print(f"🏁 [Final Answer]: {answer}")
+            return trace_logs
+
+        if response_type != "tool_call":
+            answer = "Không nhận được phản hồi hợp lệ từ mô hình."
+            break
+
+        tool_name = response.get("tool_name")
+        arguments = response.get("arguments", {})
+        allowed_names = {tool["name"] for tool in available_tools}
+        if tool_name not in allowed_names or not isinstance(arguments, dict):
+            answer = "Mô hình đề xuất công cụ hoặc tham số không hợp lệ; không thực thi."
+            break
+        if requested_id is None:
+            answer = "Cần mã vận đơn cụ thể trước khi gọi công cụ."
+            break
+        if requested_id and str(arguments.get("tracking_id", "")).strip().upper() != requested_id:
+            answer = "Mã vận đơn do mô hình đề xuất không khớp yêu cầu; không thực thi."
+            break
+        if tool_name == "update_order_status" and str(arguments.get("new_status", "")).lower() != requested_status:
+            answer = "Trạng thái cập nhật không có trong yêu cầu; không thực thi."
+            break
+
+        mcp_result = mcp_server.call_tool(tool_name, arguments)
+        observation = mcp_result.get("result", {})
+        trace_logs.append({
+            "step": step, "query": user_query, "action_type": "TOOL_EXECUTION",
+            "thought": thought, "tool_name": tool_name, "arguments": arguments,
+            "observation": observation,
+            "llm_live": llm_live,
+            "latency_ms": round((time.time() - step_start) * 1000, 2),
+        })
+        print(f"🛠️ [Action]: {tool_name}({arguments})")
+        print(f"👁️ [Observation]: {json.dumps(observation, ensure_ascii=False)}")
+
+        status = observation.get("status")
+        if status != "SUCCESS":
+            answer = observation.get("message") or observation.get("error") or "Công cụ không trả về dữ liệu hợp lệ."
+            break
+
+        if tool_name == "shipment_query":
+            data = observation.get("data", {})
+            current_status = data.get("order_status")
+            warehouse = data.get("warehouse_location")
+            if conditional_update:
+                if current_status.lower() != required_status.lower():
+                    answer = f"Vận đơn {requested_id} hiện ở trạng thái '{current_status}', không phải '{required_status}'; không cập nhật."
+                    break
+                needs_update = True
+                prompt = (
+                    f"Yêu cầu ban đầu: {user_query}\n"
+                    f"Kết quả tra cứu từ MCP: {json.dumps(observation, ensure_ascii=False)}\n"
+                    "Điều kiện đã được kiểm tra. Chỉ gọi công cụ cập nhật đúng mã vận đơn và trạng thái người dùng yêu cầu."
+                )
+                continue
+            location_text = warehouse if warehouse else "không còn ở kho"
+            answer = f"Vận đơn {observation.get('tracking_id')} đang ở trạng thái '{current_status}', vị trí lưu kho: {location_text}."
+            break
+
+        answer = observation.get("message", "Cập nhật đã được công cụ xác nhận.")
+        break
+    else:
+        answer = f"Đã đạt giới hạn {MAX_ITERATIONS} bước mà chưa hoàn tất yêu cầu."
+        step = MAX_ITERATIONS
+
+    trace_logs.append({
+        "step": step + 1, "query": user_query, "action_type": "FINAL_ANSWER",
+        "thought": "Tổng hợp từ kết quả công cụ hoặc thông báo lỗi.",
+        "output": answer, "latency_ms": 0.0,
+    })
+    print(f"🏁 [Final Answer]: {answer}")
     return trace_logs
 
 

@@ -128,3 +128,35 @@ Học viên làm bài lần lượt theo đúng luồng 3 bước tinh giản d�
 | **2. ReAct Loop & MCP Integration** | **35%** | Vòng lặp ReAct chạy mượt mà qua Native Tool Calling & MCP Server **trên LLM API thật (Gemini/OpenAI)**. | Code trong `src/mcp_server.py` + `src/tools.py` + `src/app.py` + Log API thật. |
 | **3. Waterfall Trace & Observation** | **25%** | File log `trace_waterfall.json` trích xuất đầy đủ chuỗi suy luận Thought $\rightarrow$ Action $\rightarrow$ Observation. | File log `docs/trace_waterfall.json` + `docs/trace_eval.md`. |
 | **4. Git Repository & Submission** | **15%** | Cấu trúc Repo sạch sẽ, commit chuẩn chỉ và nộp đúng hạn trên LMS VLearn. | Link Repo GitHub cá nhân. |
+
+---
+
+## UI thử nghiệm đề tài 3.2 — Supply Chain Agent
+
+UI localhost bổ sung nằm ở `src/supply_chain_ui.py`; CLI và các bài mẫu học vụ vẫn giữ nguyên. Không cần cài thêm thư viện ngoài `requirements.txt`.
+
+Trên Windows PowerShell, tại thư mục gốc repo:
+
+```powershell
+.\.venv\Scripts\python.exe -B src\supply_chain_ui.py
+```
+
+Mở `http://127.0.0.1:8765` trong trình duyệt, chọn một trong 5 trường hợp thử và nhấn **Gửi yêu cầu**. Dừng máy chủ bằng `Ctrl+C`. Nếu cổng 8765 bận, chạy thêm `--port 8766` rồi mở cổng tương ứng.
+
+| Ca | Yêu cầu | Kỳ vọng |
+| :--- | :--- | :--- |
+| TC01 | Hỏi mã vận đơn dùng để làm gì | Trả lời chung, không gọi tool |
+| TC02 | Tra cứu VD1001 | `shipment_query` → `Đang ở kho`, `Kho Hà Nội - Kệ A1` |
+| TC03 | Cập nhật VD1001 thành `Đang giao` | `update_order_status` → `SUCCESS` |
+| TC04 | Tra cứu VD1002, chỉ cập nhật nếu đang ở kho | `shipment_query` trước, `update_order_status` sau |
+| TC05 | Tra cứu VD9999 | `shipment_query` → `NOT_FOUND`, không bịa vị trí |
+
+Trong UI, xem **Waterfall trace** để xác nhận tên tool, tham số, observation, `latency_ms` và nhãn `LIVE`/`MOCK/FALLBACK`. Nếu có fallback thì câu trả lời không phải bằng chứng nghiệm thu API thật. Lượt cập nhật chỉ đổi bộ dữ liệu minh họa trong bộ nhớ của máy chủ UI; khởi động lại UI để trở về trạng thái ban đầu. UI không ghi đè `docs/trace_waterfall.json`.
+
+Để kiểm thử 5 ca qua CLI mà không ghi đè trace nộp bài:
+
+```powershell
+.\.venv\Scripts\python.exe -B src\app.py --all --no-save
+```
+
+Lưu ý: số `5/5` trên CLI là số ca **đã thực thi**, không tự khẳng định cả 5 đều đúng. Hãy xem từng Action/Observation và cảnh báo API fallback. Không đưa `.env` hoặc API key vào Git.

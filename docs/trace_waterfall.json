@@ -1,29 +1,140 @@
 [
   {
     "step": 1,
-    "query": "Chào bạn, bạn có thể giới thiệu quy chế học vụ cơ bản của Đại học VinUni không?",
+    "query": "Mã vận đơn dùng để làm gì khi tra cứu đơn hàng?",
     "action_type": "FINAL_ANSWER",
-    "thought": "Câu hỏi chung về quy chế học vụ, trả lời trực tiếp không cần gọi Tool.",
-    "output": "[Mock Agent Response]: Xin chào! Quy chế học vụ VinUni yêu cầu sinh viên tích lũy tối thiểu 120 tín chỉ và duy trì GPA trên 2.0 để tốt nghiệp.",
-    "latency_ms": 2845.93
+    "thought": "OpenAI phản hồi trực tiếp bằng văn bản (không cần gọi công cụ).",
+    "output": "Mã vận đơn được sử dụng để xác định và theo dõi trạng thái cũng như vị trí lưu kho của một đơn hàng cụ thể. Khi bạn cung cấp mã vận đơn, hệ thống sẽ tra cứu thông tin liên quan đến đơn hàng đó, giúp bạn biết được tiến trình giao hàng, tình trạng hiện tại và địa điểm của sản phẩm.",
+    "llm_live": true,
+    "latency_ms": 4568.02
   },
   {
     "step": 1,
-    "query": "Hãy tra cứu thông tin học vụ của sinh viên SV2026001.",
+    "query": "Tra cứu trạng thái và vị trí lưu kho của vận đơn VD1001.",
     "action_type": "TOOL_EXECUTION",
-    "tool_name": "academic_query",
+    "thought": "OpenAI quyết định gọi công cụ 'shipment_query' với tham số: {\"tracking_id\": \"VD1001\"}",
+    "tool_name": "shipment_query",
     "arguments": {
-      "student_id": "SV2026001"
+      "tracking_id": "VD1001"
     },
-    "observation": {},
-    "latency_ms": 799.12
+    "observation": {
+      "status": "SUCCESS",
+      "tracking_id": "VD1001",
+      "data": {
+        "order_status": "Đang ở kho",
+        "warehouse_location": "Kho Hà Nội - Kệ A1"
+      }
+    },
+    "llm_live": true,
+    "latency_ms": 1330.57
   },
   {
     "step": 2,
-    "query": "Hãy tra cứu thông tin học vụ của sinh viên SV2026001.",
+    "query": "Tra cứu trạng thái và vị trí lưu kho của vận đơn VD1001.",
     "action_type": "FINAL_ANSWER",
-    "thought": "Tổng hợp kết quả từ MCP Server thành công.",
-    "output": "Chưa thể trả lời chi tiết do chưa nhận được dữ liệu từ MCP Server (hãy hoàn thành TODO 2.1).",
-    "latency_ms": 10.0
+    "thought": "Tổng hợp từ kết quả công cụ hoặc thông báo lỗi.",
+    "output": "Vận đơn VD1001 đang ở trạng thái 'Đang ở kho', vị trí lưu kho: Kho Hà Nội - Kệ A1.",
+    "latency_ms": 0.0
+  },
+  {
+    "step": 1,
+    "query": "Cập nhật trạng thái vận đơn VD1001 thành 'Đang giao'.",
+    "action_type": "TOOL_EXECUTION",
+    "thought": "OpenAI quyết định gọi công cụ 'update_order_status' với tham số: {\"tracking_id\": \"VD1001\", \"new_status\": \"Đang giao\"}",
+    "tool_name": "update_order_status",
+    "arguments": {
+      "tracking_id": "VD1001",
+      "new_status": "Đang giao"
+    },
+    "observation": {
+      "status": "SUCCESS",
+      "tracking_id": "VD1001",
+      "previous_status": "Đang ở kho",
+      "new_status": "Đang giao",
+      "message": "Đã cập nhật vận đơn 'VD1001' từ 'Đang ở kho' sang 'Đang giao'."
+    },
+    "llm_live": true,
+    "latency_ms": 1058.61
+  },
+  {
+    "step": 2,
+    "query": "Cập nhật trạng thái vận đơn VD1001 thành 'Đang giao'.",
+    "action_type": "FINAL_ANSWER",
+    "thought": "Tổng hợp từ kết quả công cụ hoặc thông báo lỗi.",
+    "output": "Đã cập nhật vận đơn 'VD1001' từ 'Đang ở kho' sang 'Đang giao'.",
+    "latency_ms": 0.0
+  },
+  {
+    "step": 1,
+    "query": "Tra cứu vận đơn VD1002. Chỉ khi kết quả cho thấy đơn đang ở kho, hãy cập nhật trạng thái thành 'Đang giao'; nếu không, cho tôi biết lý do và giữ nguyên trạng thái.",
+    "action_type": "TOOL_EXECUTION",
+    "thought": "OpenAI quyết định gọi công cụ 'shipment_query' với tham số: {\"tracking_id\": \"VD1002\"}",
+    "tool_name": "shipment_query",
+    "arguments": {
+      "tracking_id": "VD1002"
+    },
+    "observation": {
+      "status": "SUCCESS",
+      "tracking_id": "VD1002",
+      "data": {
+        "order_status": "Đang ở kho",
+        "warehouse_location": "Kho Hà Nội - Kệ B2"
+      }
+    },
+    "llm_live": true,
+    "latency_ms": 703.69
+  },
+  {
+    "step": 2,
+    "query": "Tra cứu vận đơn VD1002. Chỉ khi kết quả cho thấy đơn đang ở kho, hãy cập nhật trạng thái thành 'Đang giao'; nếu không, cho tôi biết lý do và giữ nguyên trạng thái.",
+    "action_type": "TOOL_EXECUTION",
+    "thought": "OpenAI quyết định gọi công cụ 'update_order_status' với tham số: {\"tracking_id\": \"VD1002\", \"new_status\": \"Đang giao\"}",
+    "tool_name": "update_order_status",
+    "arguments": {
+      "tracking_id": "VD1002",
+      "new_status": "Đang giao"
+    },
+    "observation": {
+      "status": "SUCCESS",
+      "tracking_id": "VD1002",
+      "previous_status": "Đang ở kho",
+      "new_status": "Đang giao",
+      "message": "Đã cập nhật vận đơn 'VD1002' từ 'Đang ở kho' sang 'Đang giao'."
+    },
+    "llm_live": true,
+    "latency_ms": 1166.94
+  },
+  {
+    "step": 3,
+    "query": "Tra cứu vận đơn VD1002. Chỉ khi kết quả cho thấy đơn đang ở kho, hãy cập nhật trạng thái thành 'Đang giao'; nếu không, cho tôi biết lý do và giữ nguyên trạng thái.",
+    "action_type": "FINAL_ANSWER",
+    "thought": "Tổng hợp từ kết quả công cụ hoặc thông báo lỗi.",
+    "output": "Đã cập nhật vận đơn 'VD1002' từ 'Đang ở kho' sang 'Đang giao'.",
+    "latency_ms": 0.0
+  },
+  {
+    "step": 1,
+    "query": "Tra cứu trạng thái và vị trí lưu kho của vận đơn VD9999.",
+    "action_type": "TOOL_EXECUTION",
+    "thought": "OpenAI quyết định gọi công cụ 'shipment_query' với tham số: {\"tracking_id\": \"VD9999\"}",
+    "tool_name": "shipment_query",
+    "arguments": {
+      "tracking_id": "VD9999"
+    },
+    "observation": {
+      "status": "NOT_FOUND",
+      "tracking_id": "VD9999",
+      "message": "Không tìm thấy vận đơn 'VD9999'."
+    },
+    "llm_live": true,
+    "latency_ms": 732.86
+  },
+  {
+    "step": 2,
+    "query": "Tra cứu trạng thái và vị trí lưu kho của vận đơn VD9999.",
+    "action_type": "FINAL_ANSWER",
+    "thought": "Tổng hợp từ kết quả công cụ hoặc thông báo lỗi.",
+    "output": "Không tìm thấy vận đơn 'VD9999'.",
+    "latency_ms": 0.0
   }
 ]

@@ -1,0 +1,37 @@
+[
+  {
+    "id": "TC01",
+    "type": "direct_query",
+    "question": "Mã vận đơn dùng để làm gì khi tra cứu đơn hàng?",
+    "expected_behavior": "Agent giải thích cách dùng mã vận đơn ở mức khái quát, không gọi công cụ và không tự bịa trạng thái của đơn cụ thể.",
+    "complexity": "Low"
+  },
+  {
+    "id": "TC02",
+    "type": "single_tool_query",
+    "question": "Tra cứu trạng thái và vị trí lưu kho của vận đơn VD1001.",
+    "expected_behavior": "Agent gọi công cụ tra cứu với mã VD1001 và chỉ trả lời trạng thái, vị trí có trong kết quả công cụ.",
+    "complexity": "Medium"
+  },
+  {
+    "id": "TC03",
+    "type": "status_update",
+    "question": "Cập nhật trạng thái vận đơn VD1001 thành 'Đang giao'.",
+    "expected_behavior": "Agent gọi công cụ cập nhật trạng thái với mã VD1001 và trạng thái 'Đang giao'; chỉ báo thành công nếu công cụ xác nhận cập nhật.",
+    "complexity": "Medium"
+  },
+  {
+    "id": "TC04",
+    "type": "multi_step_reasoning",
+    "question": "Tra cứu vận đơn VD1002. Chỉ khi kết quả cho thấy đơn đang ở kho, hãy cập nhật trạng thái thành 'Đang giao'; nếu không, cho tôi biết lý do và giữ nguyên trạng thái.",
+    "expected_behavior": "Agent gọi công cụ tra cứu trước, đọc trạng thái trả về, rồi chỉ gọi công cụ cập nhật nếu trạng thái đúng là 'Đang ở kho'. Nếu không thỏa điều kiện thì không cập nhật.",
+    "complexity": "High"
+  },
+  {
+    "id": "TC05",
+    "type": "edge_case_handling",
+    "question": "Tra cứu trạng thái và vị trí lưu kho của vận đơn VD9999.",
+    "expected_behavior": "Agent nhận kết quả không tìm thấy từ công cụ tra cứu, thông báo không có dữ liệu cho VD9999 và không bịa trạng thái hoặc vị trí.",
+    "complexity": "Medium"
+  }
+]

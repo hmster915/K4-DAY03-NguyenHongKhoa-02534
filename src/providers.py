@@ -6,6 +6,7 @@ Hỗ trợ Native Tool Calling và chuyển đổi linh hoạt qua biến môi t
 import os
 import sys
 import json
+import re
 from typing import Dict, Any, List
 from dotenv import load_dotenv
 
@@ -35,6 +36,10 @@ class MockOfflineProvider(BaseLLMProvider):
         return f"[Mock Chatbot Response]: Xin chào! Tôi đã nhận được câu hỏi '{prompt}'. (Chế độ Chatbot không có Tool tra cứu dữ liệu thời gian thực)."
 
     def generate_with_tools(self, prompt: str, tools_schema: List[Dict[str, Any]], system_prompt: str = "") -> Dict[str, Any]:
+        if any(tool.get("name") == "shipment_query" for tool in tools_schema) or any(
+            tool.get("name") == "update_order_status" for tool in tools_schema
+        ):
+            return generate_mock_supply_chain_response(prompt, tools_schema)
         prompt_lower = prompt.lower()
         
         # Mô phỏng nhận diện intent gọi Tool
@@ -60,11 +65,52 @@ class MockOfflineProvider(BaseLLMProvider):
             }
 
 
+def generate_mock_supply_chain_response(prompt: str, tools_schema: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Deterministic offline tool selection for the shipment test cases."""
+    available = {tool.get("name") for tool in tools_schema}
+    tracking_match = re.search(r"\bVD\d+\b", prompt, re.IGNORECASE)
+    if tracking_match is None:
+        return {
+            "type": "text",
+            "content": "[Mock Agent Response]: Mã vận đơn là mã định danh để tra cứu trạng thái và vị trí lưu kho của một đơn hàng cụ thể.",
+            "thought": "Câu hỏi hướng dẫn chung; không cần gọi công cụ.",
+        }
+
+    tracking_id = tracking_match.group(0).upper()
+    if "shipment_query" in available and (
+        "chỉ khi" in prompt.lower() or "update_order_status" not in available or "cập nhật" not in prompt.lower()
+    ):
+        return {
+            "type": "tool_call",
+            "tool_name": "shipment_query",
+            "arguments": {"tracking_id": tracking_id},
+            "thought": f"Tra cứu vận đơn {tracking_id} trước khi quyết định bước tiếp theo.",
+        }
+
+    if "update_order_status" in available and "cập nhật" in prompt.lower():
+        target_match = re.search(r"(?:thành|sang)\s*['\"]?(Đang giao|Đã giao)", prompt, re.IGNORECASE)
+        new_status = target_match.group(1) if target_match else None
+        if new_status:
+            return {
+                "type": "tool_call",
+                "tool_name": "update_order_status",
+                "arguments": {"tracking_id": tracking_id, "new_status": new_status},
+                "thought": f"Người dùng yêu cầu cập nhật vận đơn {tracking_id} thành {new_status}.",
+            }
+
+    return {
+        "type": "text",
+        "content": "[Mock Agent Response]: Chưa đủ thông tin để chọn công cụ cho vận đơn này.",
+        "thought": "Không thể xác định thao tác được yêu cầu.",
+    }
+
+
 class GeminiProvider(BaseLLMProvider):
     """Google Gemini Provider (Native Tool Calling với Google GenAI SDK)"""
     def __init__(self, api_key: str = None, model: str = None):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         self.model_name = model or os.getenv("LLM_MODEL") or "gemini-2.5-flash"
+        self.last_call_live = False
 
     def generate(self, prompt: str, system_prompt: str = "") -> str:
         if not self.api_key or self.api_key == "your_gemini_api_key_here":
@@ -79,6 +125,7 @@ class GeminiProvider(BaseLLMProvider):
             return f"[Gemini Exception]: {str(e)}"
 
     def generate_with_tools(self, prompt: str, tools_schema: List[Dict[str, Any]], system_prompt: str = "") -> Dict[str, Any]:
+        self.last_call_live = False
         if not self.api_key or self.api_key == "your_gemini_api_key_here":
             print("ℹ️ [Gemini Provider]: Chưa tìm thấy GEMINI_API_KEY hợp lệ. Tự động chuyển sang Mock Offline.")
             return MockOfflineProvider().generate_with_tools(prompt, tools_schema, system_prompt)
@@ -112,6 +159,7 @@ class GeminiProvider(BaseLLMProvider):
                 contents=prompt,
                 config=config
             )
+            self.last_call_live = True
 
             # Kiểm tra xem Gemini có trả về Tool Call không
             if response.function_calls:
@@ -132,6 +180,7 @@ class GeminiProvider(BaseLLMProvider):
 
         except Exception as e:
             print(f"⚠️ [Gemini API Warning]: Không thể kết nối live API ({str(e)}). Tự động fallback về Mock.")
+            self.last_call_live = False
             return MockOfflineProvider().generate_with_tools(prompt, tools_schema, system_prompt)
 
 
@@ -140,6 +189,7 @@ class OpenAIProvider(BaseLLMProvider):
     def __init__(self, api_key: str = None, model: str = None):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model_name = model or os.getenv("LLM_MODEL") or "gpt-4o-mini"
+        self.last_call_live = False
 
     def generate(self, prompt: str, system_prompt: str = "") -> str:
         if not self.api_key or self.api_key == "your_openai_api_key_here":
@@ -157,6 +207,7 @@ class OpenAIProvider(BaseLLMProvider):
             return f"[OpenAI Exception]: {str(e)}"
 
     def generate_with_tools(self, prompt: str, tools_schema: List[Dict[str, Any]], system_prompt: str = "") -> Dict[str, Any]:
+        self.last_call_live = False
         if not self.api_key or self.api_key == "your_openai_api_key_here":
             print("ℹ️ [OpenAI Provider]: Chưa tìm thấy OPENAI_API_KEY hợp lệ. Tự động chuyển sang Mock Offline.")
             return MockOfflineProvider().generate_with_tools(prompt, tools_schema, system_prompt)
@@ -189,6 +240,7 @@ class OpenAIProvider(BaseLLMProvider):
                 tools=tools if tools else None,
                 tool_choice="auto" if tools else None
             )
+            self.last_call_live = True
 
             msg = response.choices[0].message
             if msg.tool_calls:
@@ -208,6 +260,7 @@ class OpenAIProvider(BaseLLMProvider):
                 }
         except Exception as e:
             print(f"⚠️ [OpenAI API Warning]: Không thể kết nối live API ({str(e)}). Tự động fallback về Mock.")
+            self.last_call_live = False
             return MockOfflineProvider().generate_with_tools(prompt, tools_schema, system_prompt)
 
 

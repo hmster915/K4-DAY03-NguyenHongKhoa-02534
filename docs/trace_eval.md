@@ -83,7 +83,7 @@ Dưới đây là ví dụ học vụ có sẵn từ mẫu bài lab (không ph�
 - **Tổng số Test Cases trong trace hiện tại:** 5 / 5 test cases (TC01–TC05 trong một lượt OpenAI liên tục).
 - **Số lượt gọi Tool qua MCP Server trong trace hiện tại:** 5 lượt, tất cả có `llm_live: true`.
 - **Chế độ tương tác:** OpenAI `--interactive --no-save` đã tra cứu VD1001 qua API thật, không có cảnh báo fallback.
-- **Kết quả đẩy Repo nộp bài:** [ ] Đã Commit và Push mã nguồn thành công lên GitHub cá nhân.
+- **Kết quả đẩy Repo nộp bài:** [x] Đã commit và push mã nguồn lên `origin/main` tại `https://github.com/hmster915/K4-DAY03-NguyenHongKhoa-02534`. Chưa nộp link trên VLearn.
 
 ---
 
@@ -133,7 +133,7 @@ Trích lược đúng các trường của sự kiện TC03 trong `docs/trace_wa
 }
 ```
 
-`docs/trace_waterfall.json` hiện chỉ chứa 10 sự kiện của một lượt suite OpenAI, không còn 3 sự kiện học vụ cũ hay 10 sự kiện Gemini. `python src/app.py --interactive --no-save` với OpenAI cũng tra cứu VD1001 thành công, không có cảnh báo fallback, rồi thoát bằng `exit`. Lượt Gemini interactive bị hết quota là lịch sử kiểm thử, không phải trạng thái nghiệm thu hiện tại. Chưa xác nhận push GitHub hoặc nộp lên VLearn.
+`docs/trace_waterfall.json` hiện chỉ chứa 10 sự kiện của một lượt suite OpenAI, không còn 3 sự kiện học vụ cũ hay 10 sự kiện Gemini. `python src/app.py --interactive --no-save` với OpenAI cũng tra cứu VD1001 thành công, không có cảnh báo fallback, rồi thoát bằng `exit`. Lượt Gemini interactive bị hết quota là lịch sử kiểm thử, không phải trạng thái nghiệm thu hiện tại. Đã push GitHub; chưa nộp link trên VLearn.
 
 ## Phase 7 — Self-audit trước khi nộp
 
@@ -142,4 +142,5 @@ Trích lược đúng các trường của sự kiện TC03 trong `docs/trace_wa
 - [x] CLI MCP, CLI suite và UI localhost đã được kiểm thử; UI chỉ dùng dữ liệu minh họa trong bộ nhớ và không ghi đè trace nộp bài.
 - [ ] Môi trường đang dùng Python 3.14.5 theo lựa chọn cá nhân, ngoài dải 3.10–3.12 được README/CODELAB khuyến nghị; cần chấp nhận rủi ro tương thích khi chấm.
 - [ ] Chưa xác nhận định dạng tên repo cuối cùng do tài liệu có hai quy ước (`K4-DAY03-...` và `K4B-DAY03-...` cho lớp chiều).
-- [ ] Chưa xác nhận push lên GitHub và chưa dán link repo vào LMS VLearn.
+- [x] Đã xác nhận push `origin/main` lên GitHub.
+- [ ] Chưa dán link repo vào LMS VLearn.

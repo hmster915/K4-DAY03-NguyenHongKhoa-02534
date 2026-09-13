@@ -135,6 +135,8 @@ Học viên làm bài lần lượt theo đúng luồng 3 bước tinh giản d�
 
 UI localhost bổ sung nằm ở `src/supply_chain_ui.py`; CLI và các bài mẫu học vụ vẫn giữ nguyên. Không cần cài thêm thư viện ngoài `requirements.txt`.
 
+Khi dùng OpenAI trên máy mới, sao chép `.env.example` thành `.env`, rồi đặt **cả ba** giá trị `LLM_PROVIDER=openai`, `OPENAI_API_KEY=<khóa của bạn>` và `LLM_MODEL=gpt-4o-mini`. Chỉ đổi provider/key mà để `LLM_MODEL=gemini-2.5-flash` từ mẫu sẽ làm OpenAI gọi sai tên model. `.env` được Git bỏ qua; không đưa khóa thật vào README hoặc commit.
+
 Trên Windows PowerShell, tại thư mục gốc repo:
 
 ```powershell
